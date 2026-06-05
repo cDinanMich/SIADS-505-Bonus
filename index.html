@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFL Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --surface2:  #1c2333;
+    --border:    #2a3347;
+    --accent:    #00d4ff;
+    --accent2:   #ff6b35;
+    --text:      #e8edf5;
+    --muted:     #6b7a99;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --gold:      #f59e0b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,212,255,0.08) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px);
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,14,26,0.95);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .header-meta {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .header-meta strong { color: var(--accent); }
+
+  /* ── Layout ── */
+  main { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
+
+  /* ── Stat cards ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+  .stat-card:nth-child(2)::before { background: var(--accent2); }
+  .stat-card:nth-child(3)::before { background: var(--green); }
+  .stat-card:nth-child(4)::before { background: var(--gold); }
+
+  .stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Filters ── */
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .filter-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 4px;
+  }
+  .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 8px; }
+
+  .btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  .btn.afc.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  .btn.nfc.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+  /* ── Two-column layout ── */
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th:first-child, th:nth-child(2) { text-align: left; }
+  th:hover { color: var(--accent); }
+  th.sort-asc::after  { content: ' ▲'; color: var(--accent); }
+  th.sort-desc::after { content: ' ▼'; color: var(--accent); }
+
+  td {
+    padding: 9px 14px;
+    text-align: right;
+    border-bottom: 1px solid rgba(42,51,71,0.5);
+    vertical-align: middle;
+  }
+  td:first-child, td:nth-child(2) { text-align: left; }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,212,255,0.03); }
+
+  .team-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .team-dot {
+    width: 4px;
+    height: 28px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .team-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .team-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .team-div {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .record {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .pct {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .diff {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+  }
+  .diff.pos { color: var(--green); }
+  .diff.neg { color: var(--red); }
+  .diff.neu { color: var(--muted); }
+
+  .streak {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .streak-w { background: rgba(34,197,94,0.15); color: var(--green); }
+  .streak-l { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    width: 24px;
+    text-align: center;
+  }
+  .rank.top3 {
+    background: var(--gold);
+    color: var(--bg);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  /* ── Sidebar charts ── */
+  .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .chart-body { padding: 16px; }
+
+  /* ── Leaderboard ── */
+  .leader-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(42,51,71,0.5);
+  }
+  .leader-row:last-child { border-bottom: none; }
+
+  .leader-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .leader-rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    width: 18px;
+    text-align: center;
+  }
+  .leader-bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0 10px;
+    min-width: 60px;
+  }
+  .leader-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(.16,1,.3,1);
+  }
+  .leader-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    min-width: 38px;
+    text-align: right;
+  }
+
+  /* ── Empty / loading states ── */
+  .empty {
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 60px;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-msg {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    color: var(--red);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 1100px) {
+    .content-grid { grid-template-columns: 1fr; }
+    .sidebar { flex-direction: row; flex-wrap: wrap; }
+    .chart-card { flex: 1; min-width: 280px; }
+  }
+  @media (max-width: 700px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    header { padding: 14px 16px; }
+    main { padding: 16px; }
+    .col-hide { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NFL <span>Stats</span> Hub</div>
+  <div class="header-meta">
+    <div>Data via ESPN Public API</div>
+    <div>Fetched: <strong id="fetchedAt">—</strong></div>
+  </div>
+</header>
+
+<main>
+  <div id="errorBanner" style="display:none" class="error-msg"></div>
+
+  <!-- Stat cards -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Teams</div>
+      <div class="stat-value" id="cardTeams">—</div>
+      <div class="stat-sub">Across 2 conferences</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Points For</div>
+      <div class="stat-value" id="cardAvgPF">—</div>
+      <div class="stat-sub">Per team this season</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Highest scoring</div>
+      <div class="stat-value" id="cardTopPF">—</div>
+      <div class="stat-sub" id="cardTopPFTeam">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best record</div>
+      <div class="stat-value" id="cardBest">—</div>
+      <div class="stat-sub" id="cardBestTeam">—</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <span class="filter-label">Conference</span>
+    <button class="btn active" id="fAll" onclick="setConf('ALL')">All</button>
+    <button class="btn afc" id="fAFC" onclick="setConf('AFC')">AFC</button>
+    <button class="btn nfc" id="fNFC" onclick="setConf('NFC')">NFC</button>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Division</span>
+    <button class="btn active" id="dAll" onclick="setDiv('ALL')">All</button>
+    <button class="btn" id="dE" onclick="setDiv('East')">East</button>
+    <button class="btn" id="dN" onclick="setDiv('North')">North</button>
+    <button class="btn" id="dS" onclick="setDiv('South')">South</button>
+    <button class="btn" id="dW" onclick="setDiv('West')">West</button>
+  </div>
+
+  <div class="content-grid">
+    <!-- Main table -->
+    <div class="table-wrap">
+      <div class="section-title">Standings &amp; Stats</div>
+      <div id="tableContainer">
+        <div class="loading"><div class="spinner"></div> Loading data…</div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Top scoring chart -->
+      <div class="chart-card">
+        <div class="section-title">Top 10 — Points scored</div>
+        <div class="chart-body">
+          <canvas id="chartPF" height="280"></canvas>
+        </div>
+      </div>
+
+      <!-- Best / worst differential -->
+      <div class="chart-card">
+        <div class="section-title">Point differential leaders</div>
+        <div class="chart-body" id="leaderboard"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── State ──
+let ALL_TEAMS = [];
+let filtered  = [];
+let sortCol   = 'wins';
+let sortDir   = -1; // -1 = desc
+let confFilter = 'ALL';
+let divFilter  = 'ALL';
+let chart      = null;
+
+// ── Load data ──
+async function loadData() {
+  try {
+    const res = await fetch('data/nfl_stats.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status} — make sure to run fetch_data.py first.`);
+    const json = await res.json();
+    ALL_TEAMS = json.teams || [];
+    document.getElementById('fetchedAt').textContent =
+      json.fetchedAt ? new Date(json.fetchedAt).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '—';
+    init();
+  } catch (e) {
+    document.getElementById('errorBanner').style.display = 'block';
+    document.getElementById('errorBanner').innerHTML =
+      `<strong>Could not load data/nfl_stats.json.</strong><br>` +
+      `Run <code>python fetch_data.py</code> to generate it, then reload this page.<br>` +
+      `<small>${e.message}</small>`;
+    document.getElementById('tableContainer').innerHTML =
+      '<div class="empty">No data loaded.</div>';
+  }
+}
+
+function init() {
+  updateCards();
+  applyFilters();
+}
+
+// ── Cards ──
+function updateCards() {
+  const t = ALL_TEAMS;
+  document.getElementById('cardTeams').textContent = t.length;
+  const avgPF = t.length ? Math.round(t.reduce((s,x)=>s+x.ptsFor,0)/t.length) : 0;
+  document.getElementById('cardAvgPF').textContent = avgPF;
+
+  const topPF = [...t].sort((a,b)=>b.ptsFor-a.ptsFor)[0];
+  if (topPF) {
+    document.getElementById('cardTopPF').textContent = topPF.ptsFor;
+    document.getElementById('cardTopPFTeam').textContent = topPF.shortName;
+  }
+  const best = [...t].sort((a,b)=>b.winPct-a.winPct || b.wins-a.wins)[0];
+  if (best) {
+    document.getElementById('cardBest').textContent = `${best.wins}-${best.losses}`;
+    document.getElementById('cardBestTeam').textContent = best.shortName;
+  }
+}
+
+// ── Filters ──
+function setConf(c) {
+  confFilter = c;
+  ['fAll','fAFC','fNFC'].forEach(id => document.getElementById(id).classList.remove('active'));
+  const map = {ALL:'fAll',AFC:'fAFC',NFC:'fNFC'};
+  document.getElementById(map[c]).classList.add('active');
+  applyFilters();
+}
+
+function setDiv(d) {
+  divFilter = d;
+  ['dAll','dE','dN','dS','dW'].forEach(id => document.getElementById(id).classList.remove('active'));
+  const map = {ALL:'dAll',East:'dE',North:'dN',South:'dS',West:'dW'};
+  document.getElementById(map[d]).classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  filtered = ALL_TEAMS.filter(t => {
+    if (confFilter !== 'ALL' && t.confAbbr !== confFilter) return false;
+    if (divFilter  !== 'ALL' && !t.division.includes(divFilter)) return false;
+    return true;
+  });
+  sortData();
+}
+
+// ── Sort ──
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  sortData();
+}
+
+function sortData() {
+  filtered.sort((a,b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'string') av = av.toLowerCase(), bv = bv.toLowerCase();
+    return sortDir * (av < bv ? -1 : av > bv ? 1 : 0);
+  });
+  renderTable();
+  renderChart();
+  renderLeaderboard();
+}
+
+// ── Table ──
+function renderTable() {
+  const cols = [
+    {key:'rank',     label:'#',        sortable:false},
+    {key:'name',     label:'Team',     sortable:true},
+    {key:'wins',     label:'W',        sortable:true},
+    {key:'losses',   label:'L',        sortable:true},
+    {key:'winPct',   label:'PCT',      sortable:true},
+    {key:'ptsFor',   label:'PF',       sortable:true},
+    {key:'ptsAgainst',label:'PA',      sortable:true},
+    {key:'ptDiff',   label:'DIFF',     sortable:true},
+    {key:'homeRecord',label:'HOME',    sortable:false, hide:true},
+    {key:'awayRecord',label:'AWAY',    sortable:false, hide:true},
+    {key:'streak',   label:'STRK',     sortable:false},
+  ];
+
+  const ths = cols.map(c => {
+    let cls = '';
+    if (c.sortable && c.key === sortCol) cls = sortDir === -1 ? 'sort-desc' : 'sort-asc';
+    const hide = c.hide ? ' class="col-hide"' : '';
+    const onclick = c.sortable ? ` onclick="sortBy('${c.key}')"` : '';
+    return `<th class="${cls}"${hide}${onclick}>${c.label}</th>`;
+  }).join('');
+
+  const rows = filtered.map((t, i) => {
+    const rank    = i + 1;
+    const rankEl  = rank <= 3
+      ? `<span class="rank top3">${rank}</span>`
+      : `<span class="rank">${rank}</span>`;
+    const diff    = t.ptDiff;
+    const diffCls = diff > 0 ? 'pos' : diff < 0 ? 'neg' : 'neu';
+    const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+    const strkCls = t.streak.startsWith('W') ? 'streak-w' : 'streak-l';
+    const logo    = t.logo ? `<img class="team-logo" src="${t.logo}" alt="${t.abbr}" onerror="this.style.display='none'">` : '';
+
+    return `<tr>
+      <td>${rankEl}</td>
+      <td>
+        <div class="team-cell">
+          <div class="team-dot" style="background:${t.color}"></div>
+          ${logo}
+          <div>
+            <div class="team-name">${t.shortName}</div>
+            <div class="team-div">${t.division}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="record">${t.wins}</span></td>
+      <td><span class="record">${t.losses}</span></td>
+      <td><span class="pct">${t.winPct.toFixed(3).replace(/^0/,'')}</span></td>
+      <td>${t.ptsFor}</td>
+      <td>${t.ptsAgainst}</td>
+      <td><span class="diff ${diffCls}">${diffStr}</span></td>
+      <td class="col-hide" style="color:var(--muted)">${t.homeRecord}</td>
+      <td class="col-hide" style="color:var(--muted)">${t.awayRecord}</td>
+      <td><span class="streak ${strkCls}">${t.streak}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableContainer').innerHTML = filtered.length
+    ? `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`
+    : `<div class="empty">No teams match the current filter.</div>`;
+}
+
+// ── Chart ──
+function renderChart() {
+  const top10 = [...filtered].sort((a,b)=>b.ptsFor-a.ptsFor).slice(0,10);
+  const labels = top10.map(t=>t.abbr);
+  const pfData = top10.map(t=>t.ptsFor);
+  const colors = top10.map(t=>t.color);
+
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('chartPF').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Points For',
+        data: pfData,
+        backgroundColor: colors.map(c=>c+'cc'),
+        borderColor: colors,
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1c2333',
+          titleColor: '#e8edf5',
+          bodyColor: '#6b7a99',
+          borderColor: '#2a3347',
+          borderWidth: 1,
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#6b7a99', font: { family: 'Barlow Condensed', size: 12, weight:'700' } },
+          grid: { color: 'rgba(42,51,71,0.5)' },
+        },
+        y: {
+          ticks: { color: '#6b7a99', font: { family: 'Barlow Condensed', size: 11 } },
+          grid: { color: 'rgba(42,51,71,0.5)' },
+          beginAtZero: false,
+        }
+      }
+    }
+  });
+}
+
+// ── Leaderboard ──
+function renderLeaderboard() {
+  const sorted = [...filtered].sort((a,b)=>b.ptDiff-a.ptDiff);
+  const top5   = sorted.slice(0,5);
+  const bot5   = sorted.slice(-5).reverse();
+  const maxAbs = Math.max(...filtered.map(t=>Math.abs(t.ptDiff)), 1);
+
+  function row(t, isGood) {
+    const pct  = Math.abs(t.ptDiff) / maxAbs * 100;
+    const col  = isGood ? '#22c55e' : '#ef4444';
+    const sign = t.ptDiff > 0 ? '+' : '';
+    return `<div class="leader-row">
+      <div class="leader-left">
+        <span class="leader-rank" style="color:${t.color}">${t.abbr}</span>
+      </div>
+      <div class="leader-bar-wrap">
+        <div class="leader-bar" style="width:${pct}%;background:${col}"></div>
+      </div>
+      <span class="leader-val" style="color:${col}">${sign}${t.ptDiff}</span>
+    </div>`;
+  }
+
+  document.getElementById('leaderboard').innerHTML = `
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Best</div>
+    ${top5.map(t=>row(t,true)).join('')}
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:14px 0 8px">Worst</div>
+    ${bot5.map(t=>row(t,false)).join('')}
+  `;
+}
+
+// ── Boot ──
+loadData();
+</script>
+</body>
+</html>
