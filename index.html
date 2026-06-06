@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NFL Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap">
 <style>
   :root {
     --bg:        #0a0e1a;
@@ -646,6 +644,7 @@ function renderTable() {
 
 // ── Chart ──
 function renderChart() {
+  if (typeof Chart === 'undefined') return; // Chart.js not loaded yet — ensureChartJs() will retry
   const top10 = [...filtered].sort((a,b)=>b.ptsFor-a.ptsFor).slice(0,10);
   const labels = top10.map(t=>t.abbr);
   const pfData = top10.map(t=>t.ptsFor);
@@ -726,6 +725,17 @@ function renderLeaderboard() {
 // ── Boot ──
 loadData();
 
+</script>
+<script>
+// Ensure Chart.js is loaded before any chart renders.
+// htmlpreview.github.io can deliver scripts out of order.
+(function ensureChartJs() {
+  if (typeof Chart !== 'undefined') return; // already loaded
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+  s.onload = function() { if (ALL_TEAMS.length) { renderChart(); renderLeaderboard(); } };
+  document.head.appendChild(s);
+})();
 </script>
 </body>
 </html>
