@@ -395,6 +395,124 @@
     line-height: 1.6;
   }
 
+  /* ── News Section ── */
+  #newsSection {
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+    padding: 32px 0 48px;
+    background: linear-gradient(to bottom, transparent, rgba(0,212,255,0.03));
+  }
+  .news-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .news-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .news-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .news-title span { color: var(--accent); }
+  .news-meta {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .news-loading {
+    grid-column: 1/-1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 32px 0;
+  }
+  .news-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.15s, transform 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .news-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.5;
+    transition: opacity 0.15s;
+  }
+  .news-card:hover {
+    border-color: rgba(0,212,255,0.4);
+    transform: translateY(-2px);
+  }
+  .news-card:hover::before { opacity: 1; }
+  .news-tag {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .news-headline {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .news-snippet {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    flex: 1;
+  }
+  .news-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 4px;
+  }
+  .news-link:hover { text-decoration: underline; }
+  .news-link::after { content: '→'; }
+  .news-error {
+    grid-column: 1/-1;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 20px 0;
+  }
+
   /* ── Responsive ── */
   @media (max-width: 1100px) {
     .content-grid { grid-template-columns: 1fr; }
@@ -488,6 +606,19 @@
     </div>
   </div>
 </main>
+
+<!-- ── News Section ── -->
+<section id="newsSection">
+  <div class="news-inner">
+    <div class="news-header">
+      <div class="news-title">NFL <span>News</span></div>
+      <div class="news-meta">Powered by Claude AI · <span id="newsTimestamp">Loading…</span></div>
+    </div>
+    <div id="newsGrid" class="news-grid">
+      <div class="news-loading"><div class="spinner"></div> Fetching latest NFL headlines…</div>
+    </div>
+  </div>
+</section>
 
 <script>
 // ── State ──
@@ -722,8 +853,77 @@ function renderLeaderboard() {
   `;
 }
 
+// ── News (Claude AI + web search) ──
+async function loadNews() {
+  const grid = document.getElementById('newsGrid');
+  const timestamp = document.getElementById('newsTimestamp');
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: `You are a sports news aggregator. Search for the latest NFL news and return ONLY a JSON array (no markdown, no preamble) of exactly 6 article objects. Each object must have these exact keys:
+- "tag": short category label (e.g. "Trade", "Injury", "Game Recap", "Draft", "Contract", "Playoffs")
+- "headline": punchy article headline under 12 words
+- "snippet": 1-2 sentence summary of the story (max 30 words)
+- "url": the actual source URL of the article
+- "source": publication name (e.g. "ESPN", "NFL.com", "The Athletic")
+
+Return ONLY the raw JSON array. No backticks, no explanation.`,
+        messages: [{
+          role: 'user',
+          content: 'Search for the 6 most important NFL news stories from the past 7 days. Return as a JSON array.'
+        }]
+      })
+    });
+
+    const data = await response.json();
+
+    // Extract text content from response (may include tool_use blocks)
+    const textBlock = data.content?.find(b => b.type === 'text');
+    if (!textBlock) throw new Error('No text in response');
+
+    let articles;
+    try {
+      const clean = textBlock.text.replace(/```json|```/g, '').trim();
+      articles = JSON.parse(clean);
+    } catch {
+      throw new Error('Could not parse news JSON');
+    }
+
+    timestamp.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    grid.innerHTML = articles.map(a => `
+      <div class="news-card">
+        <div class="news-tag">${escHtml(a.tag)} · ${escHtml(a.source)}</div>
+        <div class="news-headline">${escHtml(a.headline)}</div>
+        <div class="news-snippet">${escHtml(a.snippet)}</div>
+        <a class="news-link" href="${escHtml(a.url)}" target="_blank" rel="noopener">Read article</a>
+      </div>
+    `).join('');
+
+  } catch (e) {
+    timestamp.textContent = 'unavailable';
+    grid.innerHTML = `<div class="news-error">
+      Could not load news — the Claude API requires a valid API key when run outside of Claude.ai.<br>
+      <small style="opacity:0.6;margin-top:6px;display:block">${e.message}</small>
+    </div>`;
+  }
+}
+
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ── Boot ──
 loadData();
+loadNews();
 
 </script>
 <script>
